@@ -1,28 +1,28 @@
 [workspace]
 resolver = "2"
-members = ["app", "client", "tao", "integration"]
+members  = [ "app", "client", "tao", "integration" ]
 
 [workspace.package]
-version = "0.0.0"
-edition = "2021"
+version      = "0.0.0"
+edition      = "2021"
 rust-version = "1.81.0"
-authors = ["Informal Systems <hello@informal.systems>"]
+authors      = [ "Informal Systems <hello@informal.systems>" ]
 
 
 [workspace.dependencies]
-cosmwasm-std = { version = "2.0", features = ["staking"] }
-sylvia = "1.0"
-serde = "1.0"
-schemars = "0.8"
+cosmwasm-std    = { version = "2.0", features = [ "staking" ] }
+sylvia          = "1.0"
+serde           = "1.0"
+schemars        = "0.8"
 cosmwasm-schema = "2.0"
 cw-storage-plus = "2.0"
-cw-storey = "0.4"
-rstest = "0.23"
+cw-storey       = "0.4"
+rstest          = "0.23"
 
 
 eureka-client = { path = "client" }
-eureka-app = { path = "app" }
-eureka-tao = { path = "tao" }
+eureka-app    = { path = "app" }
+eureka-tao    = { path = "tao" }
 
 
 [workspace.lints.rust]
