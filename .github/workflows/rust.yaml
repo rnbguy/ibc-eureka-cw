@@ -1,0 +1,67 @@
+name: Rust
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 1
+  CARGO_PROFILE_RELEASE_DEBUG: 1
+  RUST_BACKTRACE: short
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  check-lints:
+    name: Check Lints
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust nightly toolchain with rustfmt
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt
+      - name: Install Rust stable toolchain with clippy
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Taplo
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: taplo-cli
+      - name: Run Lint Checks (fmt, clippy, taplo)
+        run: |
+          cargo +nightly fmt --all --check
+          cargo clippy -- -D warnings
+
+  check-docs:
+    name: Check Documentations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rust-docs
+      - run: cargo doc
+
+  tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - run: cargo test
