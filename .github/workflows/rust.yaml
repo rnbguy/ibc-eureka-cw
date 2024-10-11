@@ -42,6 +42,7 @@ jobs:
       - name: Run Lint Checks (fmt, clippy, taplo)
         run: |
           cargo +nightly fmt --all --check
+          taplo fmt --check
           cargo clippy -- -D warnings
 
   check-docs:
