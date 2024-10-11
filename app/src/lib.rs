@@ -1,8 +1,12 @@
+pub mod implementation;
+pub mod interface;
+
 use cosmwasm_std::Addr;
-use cw_storage_plus::Item;
+use cw_storey::containers::Item;
+use cw_storey::CwStorage;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdError, StdResult};
-use sylvia::types::{ExecCtx, InstantiateCtx};
+use sylvia::types::{InstantiateCtx, QueryCtx};
 
 pub struct Contract {
     pub authority: Item<Addr>,
@@ -11,36 +15,30 @@ pub struct Contract {
 
 #[cfg_attr(not(feature = "library"), sylvia::entry_points)]
 #[contract]
+#[sv::error(StdError)]
+#[sv::messages(crate::interface)]
 impl Contract {
     pub const fn new() -> Self {
         Self {
-            authority: Item::new("AUTHORITY"),
-            value: Item::new("VALUE"),
+            authority: Item::new(b'A'),
+            value: Item::new(b'V'),
         }
     }
 
     #[sv::msg(instantiate)]
     fn instantiate(&self, ctx: InstantiateCtx, authority: Addr) -> StdResult<Response> {
-        self.authority.save(ctx.deps.storage, &authority)?;
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        self.authority.access(&mut storage).set(&authority)?;
         self.value
-            .save(ctx.deps.storage, &"hello world".to_string())?;
+            .access(&mut storage)
+            .set(&"hello world".to_string())?;
         Ok(Response::default())
     }
 
-    #[sv::msg(exec)]
-    fn send(&self, _ctx: ExecCtx, _packet: Vec<u8>) -> StdResult<Response> {
-        Ok(Response::default())
-    }
-
-    #[sv::msg(exec)]
-    fn receive(&self, ctx: ExecCtx, packet: Vec<u8>) -> StdResult<Response> {
-        if ctx.info.sender != self.authority.load(ctx.deps.storage)? {
-            return Err(StdError::generic_err("unauthorized"));
-        }
-        self.value.save(
-            ctx.deps.storage,
-            &String::from_utf8_lossy(&packet).to_string(),
-        )?;
-        Ok(Response::default())
+    #[sv::msg(query)]
+    fn query(&self, ctx: QueryCtx) -> StdResult<String> {
+        let mut storage = CwStorage(ctx.deps.storage);
+        Ok(self.value.access(&mut storage).get()?.unwrap_or_default())
     }
 }

@@ -1,20 +1,27 @@
-use cw_storage_plus::{Item, Map};
+pub mod implementation;
+pub mod interface;
+
+use cosmwasm_std::StdError;
+use cw_storey::containers::{Item, Map};
+use cw_storey::CwStorage;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdResult};
-use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx};
+use sylvia::types::InstantiateCtx;
 
 pub struct Contract {
     pub client_state: Item<Vec<u8>>,
-    pub consensus_states: Map<u64, Vec<u8>>,
+    pub consensus_states: Map<u64, Item<Vec<u8>>>,
 }
 
 #[cfg_attr(not(feature = "library"), sylvia::entry_points)]
 #[contract]
+#[sv::error(StdError)]
+#[sv::messages(crate::interface)]
 impl Contract {
     pub const fn new() -> Self {
         Self {
-            client_state: Item::new("CLIENT_STATE"),
-            consensus_states: Map::new("CONSENSUS_STATES"),
+            client_state: Item::new(b'C'),
+            consensus_states: Map::new(b'S'),
         }
     }
 
@@ -25,31 +32,12 @@ impl Contract {
         client_state: Vec<u8>,
         consensus_state: Vec<u8>,
     ) -> StdResult<Response> {
-        self.client_state.save(ctx.deps.storage, &client_state)?;
+        let mut storage = CwStorage(ctx.deps.storage);
+        self.client_state.access(&mut storage).set(&client_state)?;
         self.consensus_states
-            .save(ctx.deps.storage, 0, &consensus_state)?;
+            .access(&mut storage)
+            .entry_mut(&0)
+            .set(&consensus_state)?;
         Ok(Response::default())
-    }
-
-    #[sv::msg(exec)]
-    fn update(&self, _ctx: ExecCtx, _header: Vec<u8>) -> StdResult<Response> {
-        // TODO: update logic
-        Ok(Response::default())
-    }
-
-    #[sv::msg(query)]
-    fn check_membership(
-        &self,
-        _ctx: QueryCtx,
-        _height: u64,
-        _key: Vec<u8>,
-        _value: Vec<u8>,
-    ) -> StdResult<bool> {
-        Ok(true)
-    }
-
-    #[sv::msg(query)]
-    fn check_non_membership(&self, _ctx: QueryCtx, _height: u64, _key: Vec<u8>) -> StdResult<bool> {
-        Ok(true)
     }
 }

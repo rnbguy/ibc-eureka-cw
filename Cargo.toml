@@ -8,26 +8,22 @@ edition      = "2021"
 rust-version = "1.81.0"
 authors      = [ "Informal Systems <hello@informal.systems>" ]
 
-
 [workspace.dependencies]
 cosmwasm-std    = { version = "2.0", features = [ "staking" ] }
 sylvia          = "1.0"
 serde           = "1.0"
 schemars        = "0.8"
 cosmwasm-schema = "2.0"
-cw-storage-plus = "2.0"
 cw-storey       = "0.4"
+storey          = "0.3"
 rstest          = "0.23"
-
 
 eureka-client = { path = "client" }
 eureka-app    = { path = "app" }
 eureka-tao    = { path = "tao" }
 
-
-[workspace.lints.rust]
-unused_dependencies = "warn"
-
+# [workspace.lints.rust]
+# unused_crate_dependencies = "warn"
 
 [workspace.lints.clippy]
 use_self = "warn"

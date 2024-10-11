@@ -1,13 +1,15 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Addr;
-use cw_storage_plus::Map;
-use eureka_app::sv::Executor;
+use cosmwasm_std::{Addr, Reply};
+use cw_storey::containers::{Item, Map};
+use cw_storey::CwStorage;
+use eureka_app::interface::sv::Executor;
+use eureka_app::interface::EurekaApplication;
 use eureka_app::Contract as EurekaApp;
-use eureka_client::sv::Querier;
+use eureka_client::interface::sv::Querier;
 use eureka_client::Contract as EurekaClient;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdError, StdResult};
-use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx, Remote};
+use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx, Remote, ReplyCtx};
 
 #[cw_serde]
 pub struct ApplicationInstance {
@@ -47,18 +49,18 @@ pub struct Payload {
     pub data: Vec<u8>,
 }
 
-pub struct TaoContract {
-    pub nonce: Map<String, u64>,
-    pub commitment: Map<(String, u64), Packet>,
+pub struct Contract {
+    pub nonce: Map<String, Item<u64>>,
+    pub commitment: Map<String, Map<u64, Item<Packet>>>,
 }
 
 #[cfg_attr(not(feature = "library"), sylvia::entry_points)]
 #[contract]
-impl TaoContract {
+impl Contract {
     pub const fn new() -> Self {
         Self {
-            nonce: Map::new("NONCE"),
-            commitment: Map::new("COMMITMENT"),
+            nonce: Map::new(b'N'),
+            commitment: Map::new(b'C'),
         }
     }
 
@@ -70,7 +72,11 @@ impl TaoContract {
     #[sv::msg(exec)]
     fn send_packet(&self, ctx: ExecCtx, packet: Packet) -> StdResult<Response> {
         if packet.header.timeout < ctx.env.block.time.seconds() {
-            return Err(StdError::generic_err("timeout"));
+            return Err(StdError::generic_err(format!(
+                "timeout is in the past: current time: {}, timeout: {}",
+                ctx.env.block.time.seconds(),
+                packet.header.timeout
+            )));
         }
 
         let Packet {
@@ -82,6 +88,9 @@ impl TaoContract {
                 },
             payloads,
         } = packet.clone();
+
+        let mut storage = CwStorage(ctx.deps.storage);
+        let mut msgs = vec![];
 
         for payload in payloads {
             let PayloadHeader {
@@ -104,32 +113,46 @@ impl TaoContract {
                 commitment_prefix: vec![],
             };
 
-            // inter contract call
-            Remote::new(application_source)
-                .executor()
-                .send(payload.data)?;
+            let msg =
+                Remote::<'_, dyn EurekaApplication<Error = StdError>>::new(application_source)
+                    .executor()
+                    .send(payload.data)?
+                    .build();
+
+            msgs.push(msg);
 
             let channel_str = format!("{:?}", channel);
 
             let nonce = self
                 .nonce
-                .may_load(ctx.deps.storage, channel_str.clone())?
+                .access(&mut storage)
+                .entry(&channel_str)
+                .get()?
                 .unwrap_or_default()
                 + 1;
 
             self.nonce
-                .save(ctx.deps.storage, channel_str.clone(), &nonce)?;
+                .access(&mut storage)
+                .entry_mut(&channel_str)
+                .set(&nonce)?;
             self.commitment
-                .save(ctx.deps.storage, (channel_str.clone(), nonce), &packet)?;
+                .access(&mut storage)
+                .entry_mut(&channel_str)
+                .entry_mut(&nonce)
+                .set(&packet)?;
         }
 
-        Ok(Response::default())
+        Ok(Response::new().add_messages(msgs))
     }
 
     #[sv::msg(exec)]
     fn receive_packet(&self, ctx: ExecCtx, packet: Packet) -> StdResult<Response> {
         if packet.header.timeout < ctx.env.block.time.seconds() {
-            return Err(StdError::generic_err("timeout"));
+            return Err(StdError::generic_err(format!(
+                "timeout is in the past: current time: {}, timeout: {}",
+                ctx.env.block.time.seconds(),
+                packet.header.timeout
+            )));
         }
 
         let Packet {
@@ -141,6 +164,9 @@ impl TaoContract {
                 },
             payloads,
         } = packet.clone();
+
+        let mut storage = CwStorage(ctx.deps.storage);
+        let mut msgs = vec![];
 
         for payload in payloads {
             let PayloadHeader {
@@ -163,36 +189,50 @@ impl TaoContract {
                 commitment_prefix: vec![],
             };
 
-            // validate commitment proof
-
             Remote::<'_, EurekaClient>::new(client_source.clone())
                 .querier(&ctx.deps.querier)
                 .check_membership(0, vec![], vec![])?;
 
-            // inter contract call
-            Remote::<'_, EurekaApp>::new(application_source)
+            let msg = Remote::<'_, EurekaApp>::new(application_source)
                 .executor()
-                .receive(payload.data)?;
+                .receive(payload.data)?
+                .build();
+
+            // let sub_msg = SubMsg::reply_on_success(msg, SUBMSG_ID);
+            msgs.push(msg);
 
             let channel_str = format!("{:?}", channel);
 
             let nonce = self
                 .nonce
-                .may_load(ctx.deps.storage, channel_str.clone())?
+                .access(&mut storage)
+                .entry(&channel_str)
+                .get()?
                 .unwrap_or_default()
                 + 1;
 
             self.nonce
-                .save(ctx.deps.storage, channel_str.clone(), &nonce)?;
+                .access(&mut storage)
+                .entry_mut(&channel_str)
+                .set(&nonce)?;
             self.commitment
-                .save(ctx.deps.storage, (channel_str.clone(), nonce), &packet)?;
+                .access(&mut storage)
+                .entry_mut(&channel_str)
+                .entry_mut(&nonce)
+                .set(&packet)?;
         }
 
-        Ok(Response::default())
+        Ok(Response::new().add_messages(msgs))
     }
 
     #[sv::msg(query)]
     fn query(&self, _ctx: QueryCtx) -> StdResult<Vec<u8>> {
         Ok(vec![])
+    }
+
+    #[sv::msg(reply)]
+    fn reply(&self, _ctx: ReplyCtx, _reply: Reply) -> StdResult<Response> {
+        // handle reply
+        Ok(Response::default())
     }
 }
