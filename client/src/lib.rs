@@ -1,12 +1,13 @@
-pub mod implementation;
 pub mod interface;
 
+use crate::interface::EurekaLightClient;
 use cosmwasm_std::StdError;
 use cw_storey::containers::{Item, Map};
 use cw_storey::CwStorage;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdResult};
 use sylvia::types::InstantiateCtx;
+use sylvia::types::{ExecCtx, QueryCtx};
 
 pub struct Contract {
     pub client_state: Item<Vec<u8>>,
@@ -39,5 +40,32 @@ impl Contract {
             .entry_mut(&0)
             .set(&consensus_state)?;
         Ok(Response::default())
+    }
+}
+
+impl EurekaLightClient for Contract {
+    type Error = StdError;
+
+    fn update(&self, _ctx: ExecCtx, _header: Vec<u8>) -> Result<Response, Self::Error> {
+        Ok(Response::default())
+    }
+
+    fn check_membership(
+        &self,
+        _ctx: QueryCtx,
+        _height: u64,
+        _key: Vec<u8>,
+        _value: Vec<u8>,
+    ) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+
+    fn check_non_membership(
+        &self,
+        _ctx: QueryCtx,
+        _height: u64,
+        _key: Vec<u8>,
+    ) -> Result<bool, Self::Error> {
+        Ok(true)
     }
 }

@@ -1,4 +1,3 @@
-pub mod implementation;
 pub mod interface;
 
 use cosmwasm_std::Addr;
@@ -6,7 +5,10 @@ use cw_storey::containers::Item;
 use cw_storey::CwStorage;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdError, StdResult};
+use sylvia::types::ExecCtx;
 use sylvia::types::{InstantiateCtx, QueryCtx};
+
+use crate::interface::EurekaApplication;
 
 pub struct Contract {
     pub authority: Item<Addr>,
@@ -40,5 +42,25 @@ impl Contract {
     fn query(&self, ctx: QueryCtx) -> StdResult<String> {
         let mut storage = CwStorage(ctx.deps.storage);
         Ok(self.value.access(&mut storage).get()?.unwrap_or_default())
+    }
+}
+
+impl EurekaApplication for Contract {
+    type Error = StdError;
+
+    fn send(&self, _ctx: ExecCtx, _packet: Vec<u8>) -> Result<Response, Self::Error> {
+        Ok(Response::default())
+    }
+
+    fn receive(&self, ctx: ExecCtx, packet: Vec<u8>) -> Result<Response, Self::Error> {
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        if Some(ctx.info.sender) != self.authority.access(&mut storage).get()? {
+            return Err(StdError::generic_err("unauthorized"));
+        }
+        self.value
+            .access(&mut storage)
+            .set(&String::from_utf8_lossy(&packet).to_string())?;
+        Ok(Response::default())
     }
 }
