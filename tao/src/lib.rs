@@ -107,6 +107,19 @@ impl Contract {
 
         let mut storage = CwStorage(ctx.deps.storage);
 
+        if self
+            .owned_contracts
+            .access(&mut storage)
+            .entry(&packet.header.client_source.to_string())
+            .get()?
+            .is_none()
+        {
+            return Err(StdError::generic_err(format!(
+                "unauthorized source client: {}",
+                packet.header.client_source
+            )));
+        }
+
         let Packet {
             header:
                 PacketHeader {
@@ -208,6 +221,19 @@ impl Contract {
         }
 
         let mut storage = CwStorage(ctx.deps.storage);
+
+        if self
+            .owned_contracts
+            .access(&mut storage)
+            .entry(&packet.header.client_destination.to_string())
+            .get()?
+            .is_none()
+        {
+            return Err(StdError::generic_err(format!(
+                "unauthorized destination client: {}",
+                packet.header.client_destination
+            )));
+        }
 
         let Packet {
             header:

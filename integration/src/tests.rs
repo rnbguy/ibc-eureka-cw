@@ -1,7 +1,8 @@
 use eureka_app::sv::mt::{CodeId as AppCodeId, ContractProxy};
-use eureka_app::Contract as ContractApp;
+use eureka_app::Contract as AppContract;
 use eureka_client::interface::sv::mt::LightClientProxy;
 use eureka_client::sv::mt::CodeId as ClientCodeId;
+use eureka_client::Contract as ClientContract;
 use eureka_tao::sv::mt::{CodeId as TaoCodeId, ContractProxy as TaoContractProxy};
 use eureka_tao::{Packet, PacketHeader, Payload, PayloadHeader};
 use rstest::rstest;
@@ -21,14 +22,36 @@ fn test_ibc_eureka_cw() {
     let authorized = Addr::unchecked("authorized");
     let unauthorized = Addr::unchecked("unauthorized");
 
-    let client_contract = client_code_id
-        .instantiate(vec![], vec![])
-        .call(&authorized)
+    let tao_contract = tao_code_id.instantiate().call(&authorized).unwrap();
+
+    let client_1_deploy = tao_contract
+        .deploy(
+            client_code_id.code_id(),
+            r#"{"client_state": [], "consensus_state": []}"#.as_bytes().into(),
+        )
+        .call(&unauthorized)
         .unwrap();
 
-    client_contract.update(vec![]).call(&unauthorized).unwrap();
+    let client_1_addrs = client_1_deploy
+        .events
+        .iter()
+        .filter(|e| {
+            e.ty == "instantiate"
+                && e.attributes[0].key == "_contract_address"
+                && e.attributes[1].key == "code_id"
+                && e.attributes[1].value == client_code_id.code_id().to_string()
+        })
+        .map(|e| e.attributes[0].value.clone())
+        .collect::<Vec<_>>();
 
-    let tao_contract = tao_code_id.instantiate().call(&authorized).unwrap();
+    assert_eq!(client_1_addrs.len(), 1);
+
+    let client_1_addr = Addr::unchecked(&client_1_addrs[0]);
+
+    let client_contract: Proxy<'_, BasicApp, ClientContract> =
+        Proxy::new(client_1_addr.clone(), &chain_1);
+
+    client_contract.update(vec![]).call(&unauthorized).unwrap();
 
     let app_1_deploy = tao_contract
         .deploy(app_1_code_id.code_id(), "{}".as_bytes().into())
@@ -72,11 +95,11 @@ fn test_ibc_eureka_cw() {
 
     let app_2_addr = Addr::unchecked(&app_2_addrs[0]);
 
-    let app_1_contract: Proxy<'_, BasicApp, ContractApp> = Proxy::new(app_1_addr.clone(), &chain_1);
-    let app_2_contract: Proxy<'_, BasicApp, ContractApp> = Proxy::new(app_2_addr.clone(), &chain_1);
+    let app_1_contract: Proxy<'_, BasicApp, AppContract> = Proxy::new(app_1_addr.clone(), &chain_1);
+    let app_2_contract: Proxy<'_, BasicApp, AppContract> = Proxy::new(app_2_addr.clone(), &chain_1);
 
     let owned_contracts = tao_contract.owned_contracts().unwrap();
-    assert_eq!(owned_contracts.len(), 2);
+    assert_eq!(owned_contracts.len(), 3);
 
     assert_eq!(app_1_contract.sent_value().unwrap(), "null");
     assert_eq!(app_1_contract.received_value().unwrap(), "null");
