@@ -17,6 +17,7 @@ sylvia          = { workspace = true }
 serde           = { workspace = true }
 schemars        = { workspace = true }
 cosmwasm-schema = { workspace = true }
+storey          = { workspace = true }
 cw-storey       = { workspace = true }
 eureka-client   = { workspace = true }
 eureka-app      = { workspace = true }

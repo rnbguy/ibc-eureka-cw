@@ -10,7 +10,7 @@ use sylvia::cw_std::Addr;
 use sylvia::multitest::{App, Proxy};
 
 #[rstest]
-fn cw_contract() {
+fn test_ibc_eureka_cw() {
     let chain_1 = App::default();
 
     let client_code_id = ClientCodeId::store_code(&chain_1);
@@ -74,6 +74,9 @@ fn cw_contract() {
 
     let app_1_contract: Proxy<'_, BasicApp, ContractApp> = Proxy::new(app_1_addr.clone(), &chain_1);
     let app_2_contract: Proxy<'_, BasicApp, ContractApp> = Proxy::new(app_2_addr.clone(), &chain_1);
+
+    let owned_contracts = tao_contract.owned_contracts().unwrap();
+    assert_eq!(owned_contracts.len(), 2);
 
     assert_eq!(app_1_contract.sent_value().unwrap(), "null");
     assert_eq!(app_1_contract.received_value().unwrap(), "null");
