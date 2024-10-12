@@ -3,7 +3,7 @@ use sylvia::interface;
 use sylvia::types::{ExecCtx, QueryCtx};
 
 #[interface]
-pub trait EurekaLightClient {
+pub trait LightClient {
     type Error: From<StdError>;
 
     #[sv::msg(exec)]
@@ -13,16 +13,18 @@ pub trait EurekaLightClient {
     fn check_membership(
         &self,
         ctx: QueryCtx,
-        height: u64,
         key: Vec<u8>,
         value: Vec<u8>,
+        height: u64,
+        proof: Vec<u8>,
     ) -> Result<bool, Self::Error>;
 
     #[sv::msg(query)]
     fn check_non_membership(
         &self,
         ctx: QueryCtx,
-        height: u64,
         key: Vec<u8>,
+        height: u64,
+        proof: Vec<u8>,
     ) -> Result<bool, Self::Error>;
 }

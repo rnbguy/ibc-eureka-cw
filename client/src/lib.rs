@@ -1,13 +1,13 @@
 pub mod interface;
 
-use crate::interface::EurekaLightClient;
 use cosmwasm_std::StdError;
 use cw_storey::containers::{Item, Map};
 use cw_storey::CwStorage;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdResult};
-use sylvia::types::InstantiateCtx;
-use sylvia::types::{ExecCtx, QueryCtx};
+use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx};
+
+use crate::interface::LightClient;
 
 pub struct Contract {
     pub client_state: Item<Vec<u8>>,
@@ -43,7 +43,7 @@ impl Contract {
     }
 }
 
-impl EurekaLightClient for Contract {
+impl LightClient for Contract {
     type Error = StdError;
 
     fn update(&self, _ctx: ExecCtx, _header: Vec<u8>) -> Result<Response, Self::Error> {
@@ -53,9 +53,10 @@ impl EurekaLightClient for Contract {
     fn check_membership(
         &self,
         _ctx: QueryCtx,
-        _height: u64,
         _key: Vec<u8>,
         _value: Vec<u8>,
+        _height: u64,
+        _proof: Vec<u8>,
     ) -> Result<bool, Self::Error> {
         Ok(true)
     }
@@ -63,8 +64,9 @@ impl EurekaLightClient for Contract {
     fn check_non_membership(
         &self,
         _ctx: QueryCtx,
-        _height: u64,
         _key: Vec<u8>,
+        _height: u64,
+        _proof: Vec<u8>,
     ) -> Result<bool, Self::Error> {
         Ok(true)
     }

@@ -5,14 +5,14 @@ use cw_storey::containers::Item;
 use cw_storey::CwStorage;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdError, StdResult};
-use sylvia::types::ExecCtx;
-use sylvia::types::{InstantiateCtx, QueryCtx};
+use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx};
 
-use crate::interface::EurekaApplication;
+use crate::interface::Application;
 
 pub struct Contract {
     pub authority: Item<Addr>,
-    pub value: Item<String>,
+    pub sent: Item<String>,
+    pub received: Item<String>,
 }
 
 #[cfg_attr(not(feature = "library"), sylvia::entry_points)]
@@ -23,44 +23,87 @@ impl Contract {
     pub const fn new() -> Self {
         Self {
             authority: Item::new(b'A'),
-            value: Item::new(b'V'),
+            sent: Item::new(b'B'),
+            received: Item::new(b'B'),
         }
     }
 
     #[sv::msg(instantiate)]
-    fn instantiate(&self, ctx: InstantiateCtx, authority: Addr) -> StdResult<Response> {
+    fn instantiate(&self, ctx: InstantiateCtx) -> StdResult<Response> {
         let mut storage = CwStorage(ctx.deps.storage);
 
-        self.authority.access(&mut storage).set(&authority)?;
-        self.value
+        self.authority.access(&mut storage).set(&ctx.info.sender)?;
+        self.sent.access(&mut storage).set(&"null".to_string())?;
+        self.received
             .access(&mut storage)
-            .set(&"hello world".to_string())?;
+            .set(&"null".to_string())?;
+
         Ok(Response::default())
     }
 
     #[sv::msg(query)]
-    fn query(&self, ctx: QueryCtx) -> StdResult<String> {
+    fn authority(&self, ctx: QueryCtx) -> StdResult<Addr> {
         let mut storage = CwStorage(ctx.deps.storage);
-        Ok(self.value.access(&mut storage).get()?.unwrap_or_default())
+        Ok(self.authority.access(&mut storage).get()?.unwrap())
+    }
+
+    #[sv::msg(query)]
+    fn sent_value(&self, ctx: QueryCtx) -> StdResult<String> {
+        let mut storage = CwStorage(ctx.deps.storage);
+        Ok(self.sent.access(&mut storage).get()?.unwrap_or_default())
+    }
+
+    #[sv::msg(query)]
+    fn received_value(&self, ctx: QueryCtx) -> StdResult<String> {
+        let mut storage = CwStorage(ctx.deps.storage);
+        Ok(self
+            .received
+            .access(&mut storage)
+            .get()?
+            .unwrap_or_default())
     }
 }
 
-impl EurekaApplication for Contract {
+impl Application for Contract {
     type Error = StdError;
 
-    fn send(&self, _ctx: ExecCtx, _packet: Vec<u8>) -> Result<Response, Self::Error> {
+    fn send(
+        &self,
+        ctx: ExecCtx,
+        destination: Addr,
+        packet: Vec<u8>,
+    ) -> Result<Response, Self::Error> {
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        if Some(&ctx.info.sender) != self.authority.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("unauthorized"));
+        }
+        self.sent.access(&mut storage).set(&format!(
+            "{}(via {}) receives {}",
+            destination,
+            ctx.info.sender,
+            String::from_utf8_lossy(&packet),
+        ))?;
         Ok(Response::default())
     }
 
-    fn receive(&self, ctx: ExecCtx, packet: Vec<u8>) -> Result<Response, Self::Error> {
+    fn receive(
+        &self,
+        ctx: ExecCtx,
+        source: Addr,
+        packet: Vec<u8>,
+    ) -> Result<Response, Self::Error> {
         let mut storage = CwStorage(ctx.deps.storage);
 
-        if Some(ctx.info.sender) != self.authority.access(&mut storage).get()? {
+        if Some(&ctx.info.sender) != self.authority.access(&mut storage).get()?.as_ref() {
             return Err(StdError::generic_err("unauthorized"));
         }
-        self.value
-            .access(&mut storage)
-            .set(&String::from_utf8_lossy(&packet).to_string())?;
+        self.received.access(&mut storage).set(&format!(
+            "{}(via {}) sent {}",
+            source,
+            ctx.info.sender,
+            String::from_utf8_lossy(&packet),
+        ))?;
         Ok(Response::default())
     }
 }
