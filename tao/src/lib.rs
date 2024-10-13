@@ -341,6 +341,7 @@ impl Contract {
     fn reply(&self, ctx: ReplyCtx, reply: Reply) -> StdResult<Response> {
         match reply.id {
             INSTANTIATE_REPLY_ID => {
+                // TODO(rano): payload is empty on cw_multi_test
                 // let code_id = u64::from_le_bytes(reply.payload.as_slice().try_into().unwrap());
 
                 let events = reply
