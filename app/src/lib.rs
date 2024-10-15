@@ -10,7 +10,15 @@ use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx};
 use crate::interface::Application;
 
 pub struct Contract {
-    pub authority: Item<Addr>,
+    // owner of the contract
+    pub owner: Item<Addr>,
+
+    // only tao can call send and receive
+    pub tao_contract: Item<Addr>,
+
+    // allowed pair
+    pub allowed_channel: Item<((Addr, Vec<u8>), (Addr, Vec<u8>), Addr)>,
+
     pub sent: Item<String>,
     pub received: Item<String>,
 }
@@ -22,17 +30,20 @@ pub struct Contract {
 impl Contract {
     pub const fn new() -> Self {
         Self {
-            authority: Item::new(b'A'),
-            sent: Item::new(b'B'),
-            received: Item::new(b'B'),
+            owner: Item::new(b'A'),
+            tao_contract: Item::new(b'B'),
+            allowed_channel: Item::new(b'C'),
+            sent: Item::new(b'D'),
+            received: Item::new(b'E'),
         }
     }
 
     #[sv::msg(instantiate)]
-    fn instantiate(&self, ctx: InstantiateCtx) -> StdResult<Response> {
+    fn instantiate(&self, ctx: InstantiateCtx, tao_addr: Addr) -> StdResult<Response> {
         let mut storage = CwStorage(ctx.deps.storage);
 
-        self.authority.access(&mut storage).set(&ctx.info.sender)?;
+        self.owner.access(&mut storage).set(&ctx.info.sender)?;
+        self.tao_contract.access(&mut storage).set(&tao_addr)?;
         self.sent.access(&mut storage).set(&"null".to_string())?;
         self.received
             .access(&mut storage)
@@ -42,9 +53,50 @@ impl Contract {
     }
 
     #[sv::msg(query)]
-    fn authority(&self, ctx: QueryCtx) -> StdResult<Addr> {
+    fn get_tao_contract(&self, ctx: QueryCtx) -> StdResult<Addr> {
         let mut storage = CwStorage(ctx.deps.storage);
-        Ok(self.authority.access(&mut storage).get()?.unwrap())
+        Ok(self.tao_contract.access(&mut storage).get()?.unwrap())
+    }
+
+    #[sv::msg(exec)]
+    fn set_tao_contract(&self, ctx: ExecCtx, tao_addr: Addr) -> Result<Response, StdError> {
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        if Some(&ctx.info.sender) != self.owner.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("unauthorized"));
+        }
+        self.tao_contract.access(&mut storage).set(&tao_addr)?;
+        Ok(Response::default())
+    }
+
+    #[sv::msg(query)]
+    fn get_allowed_channel(&self, ctx: QueryCtx) -> StdResult<String> {
+        let mut storage = CwStorage(ctx.deps.storage);
+        Ok(format!(
+            "{:?}",
+            self.allowed_channel.access(&mut storage).get()?.unwrap()
+        ))
+    }
+
+    #[sv::msg(exec)]
+    fn set_allowed_channel(
+        &self,
+        ctx: ExecCtx,
+        client_local: (Addr, Vec<u8>),
+        client_remote: (Addr, Vec<u8>),
+        application_remote: Addr,
+    ) -> Result<Response, StdError> {
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        if Some(&ctx.info.sender) != self.owner.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("unauthorized"));
+        }
+        self.allowed_channel.access(&mut storage).set(&(
+            client_local,
+            client_remote,
+            application_remote,
+        ))?;
+        Ok(Response::default())
     }
 
     #[sv::msg(query)]
@@ -70,17 +122,33 @@ impl Application for Contract {
     fn send(
         &self,
         ctx: ExecCtx,
-        destination: Addr,
+        sender_local: Addr,
+        client_local: (Addr, Vec<u8>),
+        client_remote: (Addr, Vec<u8>),
+        application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error> {
         let mut storage = CwStorage(ctx.deps.storage);
 
-        if Some(&ctx.info.sender) != self.authority.access(&mut storage).get()?.as_ref() {
-            return Err(StdError::generic_err("unauthorized"));
+        if Some(&ctx.info.sender) != self.tao_contract.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("send can only be called by tao"));
         }
+
+        if Some(&(client_local, client_remote, application_remote.clone()))
+            != self.allowed_channel.access(&mut storage).get()?.as_ref()
+        {
+            // ICS20 like check
+            return Err(StdError::generic_err("not allowed pair"));
+        }
+
+        if Some(&sender_local) != self.owner.access(&mut storage).get()?.as_ref() {
+            // ICA like check
+            return Err(StdError::generic_err("only owner can submit packet"));
+        }
+
         self.sent.access(&mut storage).set(&format!(
             "{}(via {}) receives {}",
-            destination,
+            application_remote,
             ctx.info.sender,
             String::from_utf8_lossy(&packet),
         ))?;
@@ -90,17 +158,28 @@ impl Application for Contract {
     fn receive(
         &self,
         ctx: ExecCtx,
-        source: Addr,
+        client_local: (Addr, Vec<u8>),
+        client_remote: (Addr, Vec<u8>),
+        application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error> {
+        // ignoring sender_remote (like, sender_local in send), as remote tao contract is trusted
+
         let mut storage = CwStorage(ctx.deps.storage);
 
-        if Some(&ctx.info.sender) != self.authority.access(&mut storage).get()?.as_ref() {
-            return Err(StdError::generic_err("unauthorized"));
+        if Some(&ctx.info.sender) != self.tao_contract.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("receive can only be called by tao"));
         }
+
+        if Some(&(client_local, client_remote, application_remote.clone()))
+            != self.allowed_channel.access(&mut storage).get()?.as_ref()
+        {
+            return Err(StdError::generic_err("not allowed pair"));
+        }
+
         self.received.access(&mut storage).set(&format!(
             "{}(via {}) sent {}",
-            source,
+            application_remote,
             ctx.info.sender,
             String::from_utf8_lossy(&packet),
         ))?;

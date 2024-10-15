@@ -55,6 +55,7 @@ impl LightClient for Contract {
         _ctx: QueryCtx,
         _key: Vec<u8>,
         _value: Vec<u8>,
+        _commitment_prefix: Vec<u8>,
         _height: u64,
         _proof: Vec<u8>,
     ) -> Result<bool, Self::Error> {
@@ -65,6 +66,7 @@ impl LightClient for Contract {
         &self,
         _ctx: QueryCtx,
         _key: Vec<u8>,
+        _commitment_prefix: Vec<u8>,
         _height: u64,
         _proof: Vec<u8>,
     ) -> Result<bool, Self::Error> {

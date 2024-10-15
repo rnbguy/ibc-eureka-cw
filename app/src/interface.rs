@@ -10,11 +10,20 @@ pub trait Application {
     fn send(
         &self,
         ctx: ExecCtx,
-        destination: Addr,
+        sender_local: Addr,
+        client_local: (Addr, Vec<u8>),
+        client_remote: (Addr, Vec<u8>),
+        application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error>;
 
     #[sv::msg(exec)]
-    fn receive(&self, ctx: ExecCtx, source: Addr, packet: Vec<u8>)
-        -> Result<Response, Self::Error>;
+    fn receive(
+        &self,
+        ctx: ExecCtx,
+        client_local: (Addr, Vec<u8>),
+        client_remote: (Addr, Vec<u8>),
+        application_remote: Addr,
+        packet: Vec<u8>,
+    ) -> Result<Response, Self::Error>;
 }

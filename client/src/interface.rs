@@ -15,6 +15,7 @@ pub trait LightClient {
         ctx: QueryCtx,
         key: Vec<u8>,
         value: Vec<u8>,
+        commitment_prefix: Vec<u8>,
         height: u64,
         proof: Vec<u8>,
     ) -> Result<bool, Self::Error>;
@@ -24,6 +25,7 @@ pub trait LightClient {
         &self,
         ctx: QueryCtx,
         key: Vec<u8>,
+        commitment_prefix: Vec<u8>,
         height: u64,
         proof: Vec<u8>,
     ) -> Result<bool, Self::Error>;
