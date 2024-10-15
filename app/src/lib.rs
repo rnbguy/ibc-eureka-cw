@@ -24,7 +24,7 @@ pub struct Contract {
     // only tao can call send and receive
     pub tao_contract: Item<Addr>,
 
-    // allowed pair
+    // allowed channel
     pub allowed_channel: Item<Channel>,
 
     pub sent: Item<String>,
@@ -149,7 +149,7 @@ impl Application for Contract {
         }) != self.allowed_channel.access(&mut storage).get()?.as_ref()
         {
             // ICS20 like check
-            return Err(StdError::generic_err("not allowed pair"));
+            return Err(StdError::generic_err("not allowed channel"));
         }
 
         if Some(&sender_local) != self.owner.access(&mut storage).get()?.as_ref() {
@@ -188,7 +188,7 @@ impl Application for Contract {
             application_remote: application_remote.clone(),
         }) != self.allowed_channel.access(&mut storage).get()?.as_ref()
         {
-            return Err(StdError::generic_err("not allowed pair"));
+            return Err(StdError::generic_err("not allowed channel"));
         }
 
         self.received.access(&mut storage).set(&format!(
