@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Response, StdError};
+use cosmwasm_std::{Addr, Coin, Response, StdError};
 use sylvia::interface;
 use sylvia::types::ExecCtx;
 
@@ -21,6 +21,7 @@ pub trait Application {
     fn receive(
         &self,
         ctx: ExecCtx,
+        sent_funds: Vec<Coin>,
         client_local: (Addr, Vec<u8>),
         client_remote: (Addr, Vec<u8>),
         application_remote: Addr,

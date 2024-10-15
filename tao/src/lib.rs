@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Coin, Uint128};
 use cw_storey::containers::{Item, Map};
 use cw_storey::CwStorage;
 use eureka_app::interface::sv::Executor;
@@ -28,6 +30,7 @@ pub struct Packet {
 pub struct PayloadHeader {
     pub application_source: Addr,
     pub application_destination: Addr,
+    pub funds: Vec<Coin>,
 }
 
 #[cw_serde]
@@ -97,17 +100,34 @@ impl Contract {
             assert_eq!(nonce, &stored_nonce, "nonce mismatch");
         }
 
+        {
+            // sum of funds should match the funds sent to the contract
+            let mut total_funds: HashMap<String, Uint128> = std::collections::HashMap::new();
+
+            for payload in payloads {
+                for fund in &payload.header.funds {
+                    *total_funds.entry(fund.denom.clone()).or_default() += fund.amount;
+                }
+            }
+
+            for fund in ctx.info.funds.iter() {
+                assert!(*total_funds.entry(fund.denom.clone()).or_default() <= fund.amount);
+            }
+        }
+
         let mut msgs = vec![];
 
         for payload in payloads {
             let PayloadHeader {
                 application_source,
                 application_destination,
+                funds,
             } = &payload.header;
 
             let msg =
                 Remote::<'_, dyn Application<Error = StdError>>::new(application_source.clone())
                     .executor()
+                    .with_funds(funds.clone())
                     .send(
                         ctx.info.sender.clone(),
                         client_source.clone(),
@@ -187,6 +207,7 @@ impl Contract {
             let PayloadHeader {
                 application_source,
                 application_destination,
+                funds,
             } = &payload.header;
 
             let msg = Remote::<'_, dyn Application<Error = StdError>>::new(
@@ -194,6 +215,7 @@ impl Contract {
             )
             .executor()
             .receive(
+                funds.clone(),
                 client_destination.clone(),
                 client_source.clone(),
                 application_source.clone(),

@@ -101,6 +101,7 @@ fn test_ibc_eureka_cw() {
             header: PayloadHeader {
                 application_source: app_1_contract.contract_addr.clone(),
                 application_destination: app_2_contract.contract_addr.clone(),
+                funds: vec![],
             },
             data: data_1_2.as_bytes().to_vec(),
         }],
@@ -152,6 +153,7 @@ fn test_ibc_eureka_cw() {
             header: PayloadHeader {
                 application_source: app_2_contract.contract_addr.clone(),
                 application_destination: app_1_contract.contract_addr.clone(),
+                funds: vec![],
             },
             data: data_2_1.as_bytes().to_vec(),
         }],

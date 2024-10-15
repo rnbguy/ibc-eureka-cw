@@ -1,7 +1,7 @@
 pub mod interface;
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Coin};
 use cw_storey::containers::Item;
 use cw_storey::CwStorage;
 use sylvia::contract;
@@ -169,6 +169,7 @@ impl Application for Contract {
     fn receive(
         &self,
         ctx: ExecCtx,
+        _sent_funds: Vec<Coin>,
         client_local: (Addr, Vec<u8>),
         client_remote: (Addr, Vec<u8>),
         application_remote: Addr,
