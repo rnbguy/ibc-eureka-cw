@@ -1,5 +1,6 @@
 pub mod interface;
 
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use cw_storey::containers::Item;
 use cw_storey::CwStorage;
@@ -9,6 +10,13 @@ use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx};
 
 use crate::interface::Application;
 
+#[cw_serde]
+pub struct Channel {
+    pub client_local: (Addr, Vec<u8>),
+    pub client_remote: (Addr, Vec<u8>),
+    pub application_remote: Addr,
+}
+
 pub struct Contract {
     // owner of the contract
     pub owner: Item<Addr>,
@@ -17,7 +25,7 @@ pub struct Contract {
     pub tao_contract: Item<Addr>,
 
     // allowed pair
-    pub allowed_channel: Item<((Addr, Vec<u8>), (Addr, Vec<u8>), Addr)>,
+    pub allowed_channel: Item<Channel>,
 
     pub sent: Item<String>,
     pub received: Item<String>,
@@ -91,11 +99,11 @@ impl Contract {
         if Some(&ctx.info.sender) != self.owner.access(&mut storage).get()?.as_ref() {
             return Err(StdError::generic_err("unauthorized"));
         }
-        self.allowed_channel.access(&mut storage).set(&(
+        self.allowed_channel.access(&mut storage).set(&Channel {
             client_local,
             client_remote,
             application_remote,
-        ))?;
+        })?;
         Ok(Response::default())
     }
 
@@ -134,8 +142,11 @@ impl Application for Contract {
             return Err(StdError::generic_err("send can only be called by tao"));
         }
 
-        if Some(&(client_local, client_remote, application_remote.clone()))
-            != self.allowed_channel.access(&mut storage).get()?.as_ref()
+        if Some(&Channel {
+            client_local,
+            client_remote,
+            application_remote: application_remote.clone(),
+        }) != self.allowed_channel.access(&mut storage).get()?.as_ref()
         {
             // ICS20 like check
             return Err(StdError::generic_err("not allowed pair"));
@@ -171,8 +182,11 @@ impl Application for Contract {
             return Err(StdError::generic_err("receive can only be called by tao"));
         }
 
-        if Some(&(client_local, client_remote, application_remote.clone()))
-            != self.allowed_channel.access(&mut storage).get()?.as_ref()
+        if Some(&Channel {
+            client_local,
+            client_remote,
+            application_remote: application_remote.clone(),
+        }) != self.allowed_channel.access(&mut storage).get()?.as_ref()
         {
             return Err(StdError::generic_err("not allowed pair"));
         }
