@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members  = [ "app", "client", "tao", "integration" ]
+members  = [ "applications/*", "lightclients/*", "tao", "test-integration" ]
 
 [workspace.package]
 version      = "0.0.0"
@@ -18,9 +18,11 @@ cw-storey       = "0.4"
 storey          = "0.3"
 rstest          = "0.23"
 
-eureka-client = { path = "client" }
-eureka-app    = { path = "app" }
-eureka-tao    = { path = "tao" }
+eureka-lightclient-interface = { path = "lightclients/interface" }
+eureka-lightclient-dummy     = { path = "lightclients/dummy" }
+eureka-application-interface = { path = "applications/interface" }
+eureka-application-pingpong  = { path = "applications/pingpong" }
+eureka-tao                   = { path = "tao" }
 
 # [workspace.lints.rust]
 # unused_crate_dependencies = "warn"

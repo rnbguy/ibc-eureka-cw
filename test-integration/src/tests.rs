@@ -1,6 +1,6 @@
-use eureka_app::sv::mt::{CodeId as AppCodeId, ContractProxy};
-use eureka_client::interface::sv::mt::LightClientProxy;
-use eureka_client::sv::mt::CodeId as ClientCodeId;
+use eureka_application_pingpong::sv::mt::{CodeId as AppCodeId, ContractProxy};
+use eureka_lightclient_dummy::sv::mt::CodeId as lightclientCodeId;
+use eureka_lightclient_interface::sv::mt::LightClientProxy;
 use eureka_tao::sv::mt::{CodeId as TaoCodeId, ContractProxy as TaoContractProxy};
 use eureka_tao::{Packet, PacketHeader, Payload, PayloadHeader};
 use rstest::rstest;
@@ -11,7 +11,7 @@ use sylvia::multitest::App;
 fn test_ibc_eureka_cw() {
     let chain_1 = App::default();
 
-    let client_code_id = ClientCodeId::store_code(&chain_1);
+    let lightclient_code_id = lightclientCodeId::store_code(&chain_1);
     let tao_code_id = TaoCodeId::store_code(&chain_1);
     let application_code_id = AppCodeId::store_code(&chain_1);
 
@@ -22,85 +22,85 @@ fn test_ibc_eureka_cw() {
 
     let tao_contract = tao_code_id.instantiate().call(&gov).unwrap();
 
-    let client_1_contract = client_code_id
+    let lightclient_1_contract = lightclient_code_id
         .instantiate(vec![], vec![])
         .call(&dao)
         .unwrap();
 
-    client_1_contract.update(vec![]).call(&hacker).unwrap();
+    lightclient_1_contract.update(vec![]).call(&hacker).unwrap();
 
-    let client_2_contract = client_code_id
+    let lightclient_2_contract = lightclient_code_id
         .instantiate(vec![], vec![])
         .call(&dao)
         .unwrap();
 
-    client_2_contract.update(vec![]).call(&hacker).unwrap();
+    lightclient_2_contract.update(vec![]).call(&hacker).unwrap();
 
-    let app_1_contract = application_code_id
+    let application_1_contract = application_code_id
         .instantiate(tao_contract.contract_addr.clone())
         .call(&alice)
         .unwrap();
-    let app_2_contract = application_code_id
+    let application_2_contract = application_code_id
         .instantiate(tao_contract.contract_addr.clone())
         .call(&alice)
         .unwrap();
 
     // only contract initiator can set allowed channel
 
-    app_1_contract
+    application_1_contract
         .set_allowed_channel(
-            (client_1_contract.contract_addr.clone(), vec![]),
-            (client_2_contract.contract_addr.clone(), vec![]),
-            app_2_contract.contract_addr.clone(),
+            (lightclient_1_contract.contract_addr.clone(), vec![]),
+            (lightclient_2_contract.contract_addr.clone(), vec![]),
+            application_2_contract.contract_addr.clone(),
         )
         .call(&hacker)
         .unwrap_err();
 
-    app_2_contract
+    application_2_contract
         .set_allowed_channel(
-            (client_2_contract.contract_addr.clone(), vec![]),
-            (client_1_contract.contract_addr.clone(), vec![]),
-            app_1_contract.contract_addr.clone(),
+            (lightclient_2_contract.contract_addr.clone(), vec![]),
+            (lightclient_1_contract.contract_addr.clone(), vec![]),
+            application_1_contract.contract_addr.clone(),
         )
         .call(&hacker)
         .unwrap_err();
 
-    app_1_contract
+    application_1_contract
         .set_allowed_channel(
-            (client_1_contract.contract_addr.clone(), vec![]),
-            (client_2_contract.contract_addr.clone(), vec![]),
-            app_2_contract.contract_addr.clone(),
+            (lightclient_1_contract.contract_addr.clone(), vec![]),
+            (lightclient_2_contract.contract_addr.clone(), vec![]),
+            application_2_contract.contract_addr.clone(),
         )
         .call(&alice)
         .unwrap();
 
-    app_2_contract
+    application_2_contract
         .set_allowed_channel(
-            (client_2_contract.contract_addr.clone(), vec![]),
-            (client_1_contract.contract_addr.clone(), vec![]),
-            app_1_contract.contract_addr.clone(),
+            (lightclient_2_contract.contract_addr.clone(), vec![]),
+            (lightclient_1_contract.contract_addr.clone(), vec![]),
+            application_1_contract.contract_addr.clone(),
         )
         .call(&alice)
         .unwrap();
 
-    assert_eq!(app_1_contract.sent_value().unwrap(), "null");
-    assert_eq!(app_1_contract.received_value().unwrap(), "null");
-    assert_eq!(app_2_contract.sent_value().unwrap(), "null");
-    assert_eq!(app_2_contract.received_value().unwrap(), "null");
+    assert_eq!(application_1_contract.sent_value().unwrap(), "null");
+    assert_eq!(application_1_contract.received_value().unwrap(), "null");
+    assert_eq!(application_2_contract.sent_value().unwrap(), "null");
+    assert_eq!(application_2_contract.received_value().unwrap(), "null");
 
     let data_1_2 = "1 to 2";
 
     let packet_1_2 = Packet {
         header: PacketHeader {
-            client_source: (client_1_contract.contract_addr.clone(), vec![]),
-            client_destination: (client_2_contract.contract_addr.clone(), vec![]),
+            lightclient_source: (lightclient_1_contract.contract_addr.clone(), vec![]),
+            lightclient_destination: (lightclient_2_contract.contract_addr.clone(), vec![]),
             nonce: 1,
             timeout: chain_1.block_info().time.seconds() + 10,
         },
         payloads: vec![Payload {
             header: PayloadHeader {
-                application_source: app_1_contract.contract_addr.clone(),
-                application_destination: app_2_contract.contract_addr.clone(),
+                application_source: application_1_contract.contract_addr.clone(),
+                application_destination: application_2_contract.contract_addr.clone(),
                 funds: vec![],
             },
             data: data_1_2.as_bytes().to_vec(),
@@ -119,10 +119,10 @@ fn test_ibc_eureka_cw() {
         .unwrap();
 
     assert_eq!(
-        app_1_contract.sent_value().unwrap(),
+        application_1_contract.sent_value().unwrap(),
         format!(
             "{}(via {}) receives {}",
-            app_2_contract.contract_addr, tao_contract.contract_addr, data_1_2
+            application_2_contract.contract_addr, tao_contract.contract_addr, data_1_2
         )
     );
 
@@ -133,10 +133,10 @@ fn test_ibc_eureka_cw() {
         .unwrap();
 
     assert_eq!(
-        app_2_contract.received_value().unwrap(),
+        application_2_contract.received_value().unwrap(),
         format!(
             "{}(via {}) sent {}",
-            app_1_contract.contract_addr, tao_contract.contract_addr, data_1_2
+            application_1_contract.contract_addr, tao_contract.contract_addr, data_1_2
         )
     );
 
@@ -144,15 +144,15 @@ fn test_ibc_eureka_cw() {
 
     let packet_2_1 = Packet {
         header: PacketHeader {
-            client_source: (client_2_contract.contract_addr.clone(), vec![]),
-            client_destination: (client_1_contract.contract_addr.clone(), vec![]),
+            lightclient_source: (lightclient_2_contract.contract_addr.clone(), vec![]),
+            lightclient_destination: (lightclient_1_contract.contract_addr.clone(), vec![]),
             nonce: 1,
             timeout: chain_1.block_info().time.seconds() + 10,
         },
         payloads: vec![Payload {
             header: PayloadHeader {
-                application_source: app_2_contract.contract_addr.clone(),
-                application_destination: app_1_contract.contract_addr.clone(),
+                application_source: application_2_contract.contract_addr.clone(),
+                application_destination: application_1_contract.contract_addr.clone(),
                 funds: vec![],
             },
             data: data_2_1.as_bytes().to_vec(),
@@ -171,10 +171,10 @@ fn test_ibc_eureka_cw() {
         .unwrap();
 
     assert_eq!(
-        app_2_contract.sent_value().unwrap(),
+        application_2_contract.sent_value().unwrap(),
         format!(
             "{}(via {}) receives {}",
-            app_1_contract.contract_addr, tao_contract.contract_addr, data_2_1
+            application_1_contract.contract_addr, tao_contract.contract_addr, data_2_1
         )
     );
 
@@ -185,10 +185,10 @@ fn test_ibc_eureka_cw() {
         .unwrap();
 
     assert_eq!(
-        app_1_contract.received_value().unwrap(),
+        application_1_contract.received_value().unwrap(),
         format!(
             "{}(via {}) sent {}",
-            app_2_contract.contract_addr, tao_contract.contract_addr, data_2_1
+            application_2_contract.contract_addr, tao_contract.contract_addr, data_2_1
         )
     );
 }

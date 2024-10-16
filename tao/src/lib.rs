@@ -4,18 +4,18 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin, Uint128};
 use cw_storey::containers::{Item, Map};
 use cw_storey::CwStorage;
-use eureka_app::interface::sv::Executor;
-use eureka_app::interface::Application;
-use eureka_client::interface::sv::Querier;
-use eureka_client::interface::LightClient;
+use eureka_application_interface::sv::Executor;
+use eureka_application_interface::Application;
+use eureka_lightclient_interface::sv::Querier;
+use eureka_lightclient_interface::LightClient;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdError, StdResult};
 use sylvia::types::{ExecCtx, InstantiateCtx, Remote};
 
 #[cw_serde]
 pub struct PacketHeader {
-    pub client_source: (Addr, Vec<u8>),
-    pub client_destination: (Addr, Vec<u8>),
+    pub lightclient_source: (Addr, Vec<u8>),
+    pub lightclient_destination: (Addr, Vec<u8>),
     pub nonce: u64,
     pub timeout: u64,
 }
@@ -68,8 +68,8 @@ impl Contract {
         let Packet {
             header:
                 PacketHeader {
-                    client_source,
-                    client_destination,
+                    lightclient_source,
+                    lightclient_destination,
                     nonce,
                     timeout,
                 },
@@ -86,7 +86,7 @@ impl Contract {
 
         let mut storage = CwStorage(ctx.deps.storage);
 
-        let connection_str = format!("{:?}-{:?}", client_source, client_destination);
+        let connection_str = format!("{:?}-{:?}", lightclient_source, lightclient_destination);
 
         let stored_nonce = self
             .sent_nonce
@@ -130,8 +130,8 @@ impl Contract {
                     .with_funds(funds.clone())
                     .send(
                         ctx.info.sender.clone(),
-                        client_source.clone(),
-                        client_destination.clone(),
+                        lightclient_source.clone(),
+                        lightclient_destination.clone(),
                         application_destination.clone(),
                         payload.data.clone(),
                     )?
@@ -165,8 +165,8 @@ impl Contract {
         let Packet {
             header:
                 PacketHeader {
-                    client_source,
-                    client_destination,
+                    lightclient_source,
+                    lightclient_destination,
                     nonce,
                     timeout,
                 },
@@ -183,7 +183,7 @@ impl Contract {
 
         let mut storage = CwStorage(ctx.deps.storage);
 
-        let connection_str = format!("{:?}-{:?}", client_source, client_destination);
+        let connection_str = format!("{:?}-{:?}", lightclient_source, lightclient_destination);
         let stored_nonce = self
             .received_nonce
             .access(&mut storage)
@@ -197,9 +197,9 @@ impl Contract {
         }
 
         // validate commitment proof
-        Remote::<'_, dyn LightClient<Error = StdError>>::new(client_source.0.clone())
+        Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_source.0.clone())
             .querier(&ctx.deps.querier)
-            .check_membership(vec![], vec![], client_source.1.clone(), height, proof)?;
+            .check_membership(vec![], vec![], lightclient_source.1.clone(), height, proof)?;
 
         let mut msgs = vec![];
 
@@ -216,8 +216,8 @@ impl Contract {
             .executor()
             .receive(
                 funds.clone(),
-                client_destination.clone(),
-                client_source.clone(),
+                lightclient_destination.clone(),
+                lightclient_source.clone(),
                 application_source.clone(),
                 payload.data.clone(),
             )?

@@ -1,15 +1,9 @@
 [package]
-name         = "eureka-client"
+name         = "eureka-lightclient-interface"
 version      = { workspace = true }
 edition      = { workspace = true }
 rust-version = { workspace = true }
 authors      = { workspace = true }
-
-[features]
-library = [  ]
-
-[lib]
-crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
 cosmwasm-std    = { workspace = true }
@@ -17,10 +11,6 @@ sylvia          = { workspace = true }
 serde           = { workspace = true }
 schemars        = { workspace = true }
 cosmwasm-schema = { workspace = true }
-cw-storey       = { workspace = true }
-
-[dev-dependencies]
-sylvia = { workspace = true, features = [ "mt" ] }
 
 [lints]
 workspace = true

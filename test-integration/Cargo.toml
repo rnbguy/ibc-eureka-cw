@@ -1,0 +1,19 @@
+[package]
+name         = "test-integration"
+edition      = { workspace = true }
+version      = { workspace = true }
+rust-version = { workspace = true }
+authors      = { workspace = true }
+publish      = false
+
+[dependencies]
+sylvia                       = { workspace = true, features = [ "mt" ] }
+rstest                       = { workspace = true }
+eureka-tao                   = { workspace = true }
+eureka-lightclient-interface = { workspace = true }
+eureka-application-interface = { workspace = true }
+eureka-lightclient-dummy     = { workspace = true }
+eureka-application-pingpong  = { workspace = true }
+
+[lints]
+workspace = true

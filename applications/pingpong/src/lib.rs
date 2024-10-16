@@ -1,19 +1,16 @@
-pub mod interface;
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin};
 use cw_storey::containers::Item;
 use cw_storey::CwStorage;
+use eureka_application_interface::Application;
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdError, StdResult};
 use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx};
 
-use crate::interface::Application;
-
 #[cw_serde]
 pub struct Channel {
-    pub client_local: (Addr, Vec<u8>),
-    pub client_remote: (Addr, Vec<u8>),
+    pub lightclient_local: (Addr, Vec<u8>),
+    pub lightclient_remote: (Addr, Vec<u8>),
     pub application_remote: Addr,
 }
 
@@ -34,7 +31,7 @@ pub struct Contract {
 #[cfg_attr(not(feature = "library"), sylvia::entry_points)]
 #[contract]
 #[sv::error(StdError)]
-#[sv::messages(crate::interface)]
+#[sv::messages(eureka_application_interface)]
 impl Contract {
     pub const fn new() -> Self {
         Self {
@@ -90,8 +87,8 @@ impl Contract {
     fn set_allowed_channel(
         &self,
         ctx: ExecCtx,
-        client_local: (Addr, Vec<u8>),
-        client_remote: (Addr, Vec<u8>),
+        lightclient_local: (Addr, Vec<u8>),
+        lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
     ) -> Result<Response, StdError> {
         let mut storage = CwStorage(ctx.deps.storage);
@@ -100,8 +97,8 @@ impl Contract {
             return Err(StdError::generic_err("unauthorized"));
         }
         self.allowed_channel.access(&mut storage).set(&Channel {
-            client_local,
-            client_remote,
+            lightclient_local,
+            lightclient_remote,
             application_remote,
         })?;
         Ok(Response::default())
@@ -131,8 +128,8 @@ impl Application for Contract {
         &self,
         ctx: ExecCtx,
         sender_local: Addr,
-        client_local: (Addr, Vec<u8>),
-        client_remote: (Addr, Vec<u8>),
+        lightclient_local: (Addr, Vec<u8>),
+        lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error> {
@@ -143,8 +140,8 @@ impl Application for Contract {
         }
 
         if Some(&Channel {
-            client_local,
-            client_remote,
+            lightclient_local,
+            lightclient_remote,
             application_remote: application_remote.clone(),
         }) != self.allowed_channel.access(&mut storage).get()?.as_ref()
         {
@@ -170,8 +167,8 @@ impl Application for Contract {
         &self,
         ctx: ExecCtx,
         _sent_funds: Vec<Coin>,
-        client_local: (Addr, Vec<u8>),
-        client_remote: (Addr, Vec<u8>),
+        lightclient_local: (Addr, Vec<u8>),
+        lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error> {
@@ -184,8 +181,8 @@ impl Application for Contract {
         }
 
         if Some(&Channel {
-            client_local,
-            client_remote,
+            lightclient_local,
+            lightclient_remote,
             application_remote: application_remote.clone(),
         }) != self.allowed_channel.access(&mut storage).get()?.as_ref()
         {

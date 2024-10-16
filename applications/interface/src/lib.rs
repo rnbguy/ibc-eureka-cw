@@ -11,8 +11,8 @@ pub trait Application {
         &self,
         ctx: ExecCtx,
         sender_local: Addr,
-        client_local: (Addr, Vec<u8>),
-        client_remote: (Addr, Vec<u8>),
+        lightclient_local: (Addr, Vec<u8>),
+        lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error>;
@@ -22,8 +22,8 @@ pub trait Application {
         &self,
         ctx: ExecCtx,
         sent_funds: Vec<Coin>,
-        client_local: (Addr, Vec<u8>),
-        client_remote: (Addr, Vec<u8>),
+        lightclient_local: (Addr, Vec<u8>),
+        lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error>;

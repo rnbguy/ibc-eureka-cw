@@ -1,5 +1,5 @@
 [package]
-name         = "eureka-tao"
+name         = "eureka-application-pingpong"
 version      = { workspace = true }
 edition      = { workspace = true }
 rust-version = { workspace = true }
@@ -18,11 +18,7 @@ serde                        = { workspace = true }
 schemars                     = { workspace = true }
 cosmwasm-schema              = { workspace = true }
 cw-storey                    = { workspace = true }
-eureka-lightclient-interface = { workspace = true }
 eureka-application-interface = { workspace = true }
-
-[dev-dependencies]
-sylvia = { workspace = true, features = [ "mt" ] }
 
 [lints]
 workspace = true
