@@ -10,7 +10,7 @@ pub trait Application {
     fn send(
         &self,
         ctx: ExecCtx,
-        sender_local: Addr,
+        packer_sender: Addr,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,

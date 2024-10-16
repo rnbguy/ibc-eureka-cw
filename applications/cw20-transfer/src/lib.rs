@@ -229,7 +229,7 @@ impl Application for Contract {
     fn send(
         &self,
         ctx: ExecCtx,
-        _sender_local: Addr,
+        packer_sender: Addr,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
@@ -252,9 +252,6 @@ impl Application for Contract {
             return Err(StdError::generic_err("not allowed channel"));
         }
 
-        // _sender_local is ignored because anyone can send tokens to the remote application
-        // in ICA, it is not the case. Only the sender can send packets to the remote application
-
         assert!(
             packet.len() <= 1024,
             "packet size must be less than or equal to 1024 bytes"
@@ -262,6 +259,23 @@ impl Application for Contract {
 
         let TransferPacket { sender, fund, .. } =
             serde_json::from_slice(&packet).map_err(|e| StdError::generic_err(e.to_string()))?;
+
+        if packer_sender != sender {
+            return Err(StdError::generic_err(
+                "packer_sender must be equal to origin sender of the packet",
+            ));
+        }
+
+        // Note that ICS20 doesn't need to check `packer_sender` against our contract's state.
+        // It just validates against the packet itself. This is fine because ICS20 channels are shared.
+        // Everyone transfers tokens using the same channel.
+        // The transfer app is restrictive enough, so we don't need per-user channel ownership.
+        //
+        // But ICA requires each user to own their unique channel. This is because the receiving end can
+        // execute arbitrary messages on behalf of the user, which could be destructive if misused.
+        // To prevent unwanted message execution, `packet_sender` must match the owner of the channel as recorded
+        // in our contract's state. This ensures that only authorized users can perform actions over their unique
+        // channels, adding an extra layer of security necessary for ICA operations.
 
         let TransferCoin { amount, denom } = fund;
 
@@ -318,8 +332,6 @@ impl Application for Contract {
         application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error> {
-        // ignoring sender_remote (like, sender_local in send), as remote tao contract is trusted
-
         let mut storage = CwStorage(ctx.deps.storage);
 
         if Some(&ctx.info.sender) != self.tao_contract.access(&mut storage).get()?.as_ref() {

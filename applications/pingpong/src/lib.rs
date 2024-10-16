@@ -127,7 +127,7 @@ impl Application for Contract {
     fn send(
         &self,
         ctx: ExecCtx,
-        sender_local: Addr,
+        packer_sender: Addr,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
@@ -149,7 +149,7 @@ impl Application for Contract {
             return Err(StdError::generic_err("not allowed channel"));
         }
 
-        if Some(&sender_local) != self.owner.access(&mut storage).get()?.as_ref() {
+        if Some(&packer_sender) != self.owner.access(&mut storage).get()?.as_ref() {
             // ICA like check
             return Err(StdError::generic_err("only owner can submit packet"));
         }
@@ -172,8 +172,6 @@ impl Application for Contract {
         application_remote: Addr,
         packet: Vec<u8>,
     ) -> Result<Response, Self::Error> {
-        // ignoring sender_remote (like, sender_local in send), as remote tao contract is trusted
-
         let mut storage = CwStorage(ctx.deps.storage);
 
         if Some(&ctx.info.sender) != self.tao_contract.access(&mut storage).get()?.as_ref() {
