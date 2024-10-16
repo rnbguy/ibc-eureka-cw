@@ -265,6 +265,8 @@ impl Application for Contract {
 
         let TransferCoin { amount, denom } = fund;
 
+        assert!(amount > Uint128::zero(), "amount must be greater than zero");
+
         // escrow or burn tokens
         let msg = match denom {
             TransferDenom::Native(origin) => {
