@@ -165,9 +165,9 @@ impl Contract {
                     .set(&new_cw20_addr)
                     .unwrap();
 
-                // unescrow or mint tokens
+                // resume: unescrow or mint tokens
 
-                let TransferCoin { amount, denom } = &fund;
+                let TransferCoin { amount, denom } = fund;
 
                 let msg = match denom {
                     TransferDenom::Native(origin) => {
@@ -182,7 +182,7 @@ impl Contract {
                         // mint tokens
                         cw20::Cw20Contract(local_cw20).call(Cw20ExecuteMsg::Mint {
                             recipient: receiver.to_string(),
-                            amount: *amount,
+                            amount,
                         })?
                     }
                     TransferDenom::Bridged { origin, .. } => {
@@ -190,7 +190,7 @@ impl Contract {
                         cw20::Cw20Contract(Addr::unchecked(origin)).call(
                             Cw20ExecuteMsg::Transfer {
                                 recipient: receiver.to_string(),
-                                amount: *amount,
+                                amount,
                             },
                         )?
                     }
@@ -248,7 +248,7 @@ impl Application for Contract {
         };
 
         if Some(&channel) != self.allowed_channel.access(&mut storage).get()?.as_ref() {
-            // ICS20 like check
+            // channels are permissioned
             return Err(StdError::generic_err("not allowed channel"));
         }
 
@@ -263,17 +263,16 @@ impl Application for Contract {
         let TransferPacket { sender, fund, .. } =
             serde_json::from_slice(&packet).map_err(|e| StdError::generic_err(e.to_string()))?;
 
+        let TransferCoin { amount, denom } = fund;
+
         // escrow or burn tokens
-
-        let TransferCoin { amount, denom } = &fund;
-
         let msg = match denom {
             TransferDenom::Native(origin) => {
                 assert_ne!(
                     Some(&channel),
                     self.cw20_to_channel
                         .access(&mut storage)
-                        .entry(origin)
+                        .entry(&origin)
                         .get()?
                         .as_ref()
                         .map(|(channel, _)| channel)
@@ -283,23 +282,24 @@ impl Application for Contract {
                 cw20::Cw20Contract(Addr::unchecked(origin)).call(Cw20ExecuteMsg::TransferFrom {
                     owner: sender.to_string(),
                     recipient: ctx.env.contract.address.to_string(),
-                    amount: *amount,
+                    amount,
                 })?
             }
             TransferDenom::Bridged { wrapped, origin } => {
                 assert_eq!(
-                    Some((&channel, origin)),
+                    Some((&channel, &origin)),
                     self.cw20_to_channel
                         .access(&mut storage)
-                        .entry(wrapped)
+                        .entry(&wrapped)
                         .get()?
                         .as_ref()
                         .map(|(channel, origin)| (channel, origin))
                 );
+
                 // burn tokens
                 cw20::Cw20Contract(Addr::unchecked(wrapped)).call(Cw20ExecuteMsg::BurnFrom {
                     owner: sender.to_string(),
-                    amount: *amount,
+                    amount,
                 })?
             }
         };
@@ -342,10 +342,9 @@ impl Application for Contract {
         let TransferPacket { receiver, fund, .. } =
             serde_json::from_slice(&packet).map_err(|e| StdError::generic_err(e.to_string()))?;
 
-        // create new cw20 token, if not present
-
         let TransferCoin { denom, .. } = &fund;
 
+        // instantiate new cw20 token, if not present
         if let TransferDenom::Native(origin) = denom {
             if self
                 .channel_to_cw20
@@ -354,8 +353,6 @@ impl Application for Contract {
                 .get()?
                 .is_none()
             {
-                // instantiate new cw20 token
-
                 let instantiate_msg = cw20_base::msg::InstantiateMsg {
                     name: format!("{:?}-{:?}", &channel, &origin),
                     symbol: origin.clone(),
@@ -382,13 +379,11 @@ impl Application for Contract {
             }
         }
 
+        let TransferCoin { denom, amount } = fund;
+
         // unescrow or mint tokens
-
-        let TransferCoin { amount, denom } = &fund;
-
         let msg = match denom {
             TransferDenom::Native(origin) => {
-                // create new cw20 token, if not present
                 let local_cw20 = self
                     .channel_to_cw20
                     .access(&mut storage)
@@ -399,14 +394,14 @@ impl Application for Contract {
                 // mint tokens
                 cw20::Cw20Contract(local_cw20).call(Cw20ExecuteMsg::Mint {
                     recipient: receiver.to_string(),
-                    amount: *amount,
+                    amount,
                 })?
             }
             TransferDenom::Bridged { origin, .. } => {
                 // unescrow tokens
                 cw20::Cw20Contract(Addr::unchecked(origin)).call(Cw20ExecuteMsg::Transfer {
                     recipient: receiver.to_string(),
-                    amount: *amount,
+                    amount,
                 })?
             }
         };
