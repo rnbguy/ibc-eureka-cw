@@ -11,12 +11,12 @@ _Built using [sylvia][sylvia] and [storey][storey]._
 
 ## Light Client
 
-- [interface](lightclients/interface)
+- [interface](lightclients/interface/src/lib.rs)
 - [dummy](lightclients/dummy): success on everything
 
 ## Application
 
-- [interface](applications/interface)
+- [interface](applications/interface/src/lib.rs)
 - [pingpong](applications/pingpong): send/receive message between chains
 - [cw20 transfer](applications/cw20-transfer): transfer [CW20][cw20] tokens
   between chains
