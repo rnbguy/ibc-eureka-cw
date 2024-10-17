@@ -229,7 +229,7 @@ impl Application for Contract {
     fn send(
         &self,
         ctx: ExecCtx,
-        packer_sender: Addr,
+        packet_sender: Addr,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
@@ -260,13 +260,13 @@ impl Application for Contract {
         let TransferPacket { sender, fund, .. } =
             serde_json::from_slice(&packet).map_err(|e| StdError::generic_err(e.to_string()))?;
 
-        if packer_sender != sender {
+        if packet_sender != sender {
             return Err(StdError::generic_err(
-                "packer_sender must be equal to origin sender of the packet",
+                "packet_sender must be equal to origin sender of the packet",
             ));
         }
 
-        // Note that ICS20 doesn't need to check `packer_sender` against our contract's state.
+        // Note that ICS20 doesn't need to check `packet_sender` against our contract's state.
         // It just validates against the packet itself. This is fine because ICS20 channels are shared.
         // Everyone transfers tokens using the same channel.
         // The transfer app is restrictive enough, so we don't need per-user channel ownership.
