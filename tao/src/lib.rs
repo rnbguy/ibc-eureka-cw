@@ -42,8 +42,8 @@ pub struct Payload {
 pub struct Contract {
     pub sent_nonce: Map<String, Item<u64>>,
     pub sent_packet: Map<String, Map<u64, Item<Packet>>>,
-    pub received_nonce: Map<String, Item<u64>>,
-    pub received_packet: Map<String, Map<u64, Item<Packet>>>,
+    pub received_packet: Map<String, Map<u64, Item<()>>>,
+    pub timeout_packet: Map<String, Map<u64, Item<()>>>,
 }
 
 #[cfg_attr(not(feature = "library"), sylvia::entry_points)]
@@ -53,7 +53,7 @@ impl Contract {
         Self {
             sent_nonce: Map::new(b'A'),
             sent_packet: Map::new(b'B'),
-            received_nonce: Map::new(b'C'),
+            timeout_packet: Map::new(b'C'),
             received_packet: Map::new(b'D'),
         }
     }
@@ -96,9 +96,7 @@ impl Contract {
             .unwrap_or_default()
             + 1;
 
-        if nonce != &0 {
-            assert_eq!(nonce, &stored_nonce, "nonce mismatch");
-        }
+        assert_eq!(nonce, &stored_nonce, "nonce mismatch");
 
         {
             // sum of funds should match the funds sent to the contract
@@ -184,16 +182,16 @@ impl Contract {
         let mut storage = CwStorage(ctx.deps.storage);
 
         let connection_str = format!("{:?}-{:?}", lightclient_source, lightclient_destination);
-        let stored_nonce = self
-            .received_nonce
+
+        if self
+            .received_packet
             .access(&mut storage)
             .entry(&connection_str)
+            .entry(nonce)
             .get()?
-            .unwrap_or_default()
-            + 1;
-
-        if nonce != &0 {
-            assert_eq!(nonce, &stored_nonce, "nonce mismatch");
+            .is_some()
+        {
+            return Err(StdError::generic_err("packet already received"));
         }
 
         if Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_source.0.clone())
@@ -235,16 +233,11 @@ impl Contract {
             msgs.push(msg);
         }
 
-        self.received_nonce
-            .access(&mut storage)
-            .entry_mut(&connection_str)
-            .set(&stored_nonce)?;
-
         self.received_packet
             .access(&mut storage)
             .entry_mut(&connection_str)
-            .entry_mut(&stored_nonce)
-            .set(&packet)?;
+            .entry_mut(nonce)
+            .set(&())?;
 
         Ok(Response::new().add_messages(msgs))
     }
@@ -271,19 +264,19 @@ impl Contract {
         let mut storage = CwStorage(ctx.deps.storage);
 
         let connection_str = format!("{:?}-{:?}", lightclient_source, lightclient_destination);
-        let stored_nonce = self
-            .received_nonce
+
+        if self
+            .timeout_packet
             .access(&mut storage)
             .entry(&connection_str)
+            .entry(nonce)
             .get()?
-            .unwrap_or_default()
-            + 1;
-
-        if nonce != &0 {
-            assert_eq!(nonce, &stored_nonce, "nonce mismatch");
+            .is_some()
+        {
+            return Err(StdError::generic_err("packet already timed out"));
         }
 
-        if Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_source.0.clone())
+        if Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_destination.0.clone())
             .querier(&ctx.deps.querier)
             .status()?
             != Status::Active
@@ -292,7 +285,7 @@ impl Contract {
         }
 
         let proof_height_timestamp =
-            Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_source.0.clone())
+            Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_destination.0.clone())
                 .querier(&ctx.deps.querier)
                 .timestamp(height)?;
 
@@ -317,22 +310,27 @@ impl Contract {
                 funds,
             } = &payload.header;
 
-            let msg = Remote::<'_, dyn Application<Error = StdError>>::new(
-                application_destination.clone(),
-            )
-            .executor()
-            .timeout(
-                lightclient_destination.clone(),
-                lightclient_source.clone(),
-                application_source.clone(),
-                payload.data.clone(),
-                ctx.info.sender.clone(),
-                funds.clone(),
-            )?
-            .build();
+            let msg =
+                Remote::<'_, dyn Application<Error = StdError>>::new(application_source.clone())
+                    .executor()
+                    .timeout(
+                        lightclient_source.clone(),
+                        lightclient_destination.clone(),
+                        application_destination.clone(),
+                        payload.data.clone(),
+                        ctx.info.sender.clone(),
+                        funds.clone(),
+                    )?
+                    .build();
 
             msgs.push(msg);
         }
+
+        self.timeout_packet
+            .access(&mut storage)
+            .entry_mut(&connection_str)
+            .entry_mut(nonce)
+            .set(&())?;
 
         Ok(Response::new().add_messages(msgs))
     }
