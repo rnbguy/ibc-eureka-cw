@@ -265,6 +265,17 @@ impl Contract {
 
         let connection_str = format!("{:?}-{:?}", lightclient_source, lightclient_destination);
 
+        match self
+            .sent_packet
+            .access(&mut storage)
+            .entry(&connection_str)
+            .entry(nonce)
+            .get()?
+        {
+            Some(stored_packet) if stored_packet == packet => {}
+            _ => return Err(StdError::generic_err("packet not sent")),
+        }
+
         if self
             .timeout_packet
             .access(&mut storage)
