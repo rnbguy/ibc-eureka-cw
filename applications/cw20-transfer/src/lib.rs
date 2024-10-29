@@ -451,4 +451,18 @@ impl Application for Contract {
 
         Ok(Response::default().add_message(msg))
     }
+
+    fn timeout(
+        &self,
+        _ctx: ExecCtx,
+        _lightclient_local: (Addr, Vec<u8>),
+        _lightclient_remote: (Addr, Vec<u8>),
+        _application_remote: Addr,
+        _packet: Vec<u8>,
+        _relayer: Addr,
+        _sent_funds: Vec<Coin>,
+    ) -> Result<Response, Self::Error> {
+        // todo(rano): add timeout logic
+        Ok(Response::default())
+    }
 }

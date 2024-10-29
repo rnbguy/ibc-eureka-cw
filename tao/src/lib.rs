@@ -248,4 +248,92 @@ impl Contract {
 
         Ok(Response::new().add_messages(msgs))
     }
+
+    #[sv::msg(exec)]
+    fn timeout_packet(
+        &self,
+        ctx: ExecCtx,
+        packet: Packet,
+        height: u64,
+        proof: Vec<u8>,
+    ) -> StdResult<Response> {
+        let Packet {
+            header:
+                PacketHeader {
+                    lightclient_source,
+                    lightclient_destination,
+                    nonce,
+                    timeout,
+                },
+            payloads,
+        } = &packet;
+
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        let connection_str = format!("{:?}-{:?}", lightclient_source, lightclient_destination);
+        let stored_nonce = self
+            .received_nonce
+            .access(&mut storage)
+            .entry(&connection_str)
+            .get()?
+            .unwrap_or_default()
+            + 1;
+
+        if nonce != &0 {
+            assert_eq!(nonce, &stored_nonce, "nonce mismatch");
+        }
+
+        if Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_source.0.clone())
+            .querier(&ctx.deps.querier)
+            .status()?
+            != Status::Active
+        {
+            return Err(StdError::generic_err("light client is inactive"));
+        }
+
+        let proof_height_timestamp =
+            Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_source.0.clone())
+                .querier(&ctx.deps.querier)
+                .timestamp(height)?;
+
+        if &proof_height_timestamp < timeout {
+            return Err(StdError::generic_err(format!(
+                "timeout is in the future for proof height: current time: {}, timeout: {}",
+                proof_height_timestamp, timeout
+            )));
+        }
+
+        // validate commitment proof
+        Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_destination.0.clone())
+            .querier(&ctx.deps.querier)
+            .check_non_membership(vec![], lightclient_destination.1.clone(), height, proof)?;
+
+        let mut msgs = vec![];
+
+        for payload in payloads {
+            let PayloadHeader {
+                application_source,
+                application_destination,
+                funds,
+            } = &payload.header;
+
+            let msg = Remote::<'_, dyn Application<Error = StdError>>::new(
+                application_destination.clone(),
+            )
+            .executor()
+            .timeout(
+                lightclient_destination.clone(),
+                lightclient_source.clone(),
+                application_source.clone(),
+                payload.data.clone(),
+                ctx.info.sender.clone(),
+                funds.clone(),
+            )?
+            .build();
+
+            msgs.push(msg);
+        }
+
+        Ok(Response::new().add_messages(msgs))
+    }
 }

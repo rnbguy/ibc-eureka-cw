@@ -19,6 +19,9 @@ pub trait LightClient {
     #[sv::msg(query)]
     fn status(&self, ctx: QueryCtx) -> Result<Status, Self::Error>;
 
+    #[sv::msg(query)]
+    fn timestamp(&self, ctx: QueryCtx, height: u64) -> Result<u64, Self::Error>;
+
     #[sv::msg(exec)]
     fn prune(&self, ctx: ExecCtx) -> Result<Response, Self::Error>;
 

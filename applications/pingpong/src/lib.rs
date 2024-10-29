@@ -196,4 +196,38 @@ impl Application for Contract {
         ))?;
         Ok(Response::default())
     }
+
+    fn timeout(
+        &self,
+        ctx: ExecCtx,
+        lightclient_local: (Addr, Vec<u8>),
+        lightclient_remote: (Addr, Vec<u8>),
+        application_remote: Addr,
+        packet: Vec<u8>,
+        _relayer: Addr,
+        _sent_funds: Vec<Coin>,
+    ) -> Result<Response, Self::Error> {
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        if Some(&ctx.info.sender) != self.tao_contract.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("timeout can only be called by tao"));
+        }
+
+        if Some(&Channel {
+            lightclient_local,
+            lightclient_remote,
+            application_remote: application_remote.clone(),
+        }) != self.allowed_channel.access(&mut storage).get()?.as_ref()
+        {
+            return Err(StdError::generic_err("not allowed channel"));
+        }
+
+        self.received.access(&mut storage).set(&format!(
+            "time-out {}(via {}) sent {}",
+            application_remote,
+            ctx.info.sender,
+            String::from_utf8_lossy(&packet),
+        ))?;
+        Ok(Response::default())
+    }
 }

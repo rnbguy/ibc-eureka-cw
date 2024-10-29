@@ -53,6 +53,10 @@ impl LightClient for Contract {
         Ok(Status::Active)
     }
 
+    fn timestamp(&self, _ctx: QueryCtx, _height: u64) -> Result<u64, Self::Error> {
+        Ok(u64::MAX)
+    }
+
     fn prune(&self, _ctx: ExecCtx) -> Result<Response, Self::Error> {
         Ok(Response::default())
     }
