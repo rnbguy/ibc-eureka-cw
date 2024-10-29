@@ -496,6 +496,7 @@ impl Application for Contract {
 
         let TransferCoin { denom, amount } = fund;
 
+        // if the packer timed out, the tip goes to the timeout packet relayer
         let refund_address = match receiver {
             Receiver::Relayer => &relayer,
             Receiver::Address(_) => sender,
