@@ -1,6 +1,13 @@
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Response, StdError};
 use sylvia::interface;
 use sylvia::types::{ExecCtx, QueryCtx};
+
+#[cw_serde]
+pub enum Status {
+    Active,
+    Inactive,
+}
 
 #[interface]
 pub trait LightClient {
@@ -8,6 +15,12 @@ pub trait LightClient {
 
     #[sv::msg(exec)]
     fn update(&self, ctx: ExecCtx, header: Vec<u8>) -> Result<Response, Self::Error>;
+
+    #[sv::msg(query)]
+    fn status(&self, ctx: QueryCtx) -> Result<Status, Self::Error>;
+
+    #[sv::msg(exec)]
+    fn prune(&self, ctx: ExecCtx) -> Result<Response, Self::Error>;
 
     #[sv::msg(query)]
     fn check_membership(

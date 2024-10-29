@@ -7,7 +7,7 @@ use cw_storey::CwStorage;
 use eureka_application_interface::sv::Executor;
 use eureka_application_interface::Application;
 use eureka_lightclient_interface::sv::Querier;
-use eureka_lightclient_interface::LightClient;
+use eureka_lightclient_interface::{LightClient, Status};
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdError, StdResult};
 use sylvia::types::{ExecCtx, InstantiateCtx, Remote};
@@ -194,6 +194,14 @@ impl Contract {
 
         if nonce != &0 {
             assert_eq!(nonce, &stored_nonce, "nonce mismatch");
+        }
+
+        if Remote::<'_, dyn LightClient<Error = StdError>>::new(lightclient_source.0.clone())
+            .querier(&ctx.deps.querier)
+            .status()?
+            != Status::Active
+        {
+            return Err(StdError::generic_err("light client is inactive"));
         }
 
         // validate commitment proof

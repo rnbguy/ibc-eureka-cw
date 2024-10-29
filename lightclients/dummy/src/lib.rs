@@ -1,7 +1,7 @@
 use cosmwasm_std::StdError;
 use cw_storey::containers::{Item, Map};
 use cw_storey::CwStorage;
-use eureka_lightclient_interface::LightClient;
+use eureka_lightclient_interface::{LightClient, Status};
 use sylvia::contract;
 use sylvia::cw_std::{Response, StdResult};
 use sylvia::types::{ExecCtx, InstantiateCtx, QueryCtx};
@@ -46,6 +46,14 @@ impl LightClient for Contract {
     type Error = StdError;
 
     fn update(&self, _ctx: ExecCtx, _header: Vec<u8>) -> Result<Response, Self::Error> {
+        Ok(Response::default())
+    }
+
+    fn status(&self, _ctx: QueryCtx) -> Result<Status, Self::Error> {
+        Ok(Status::Active)
+    }
+
+    fn prune(&self, _ctx: ExecCtx) -> Result<Response, Self::Error> {
         Ok(Response::default())
     }
 
