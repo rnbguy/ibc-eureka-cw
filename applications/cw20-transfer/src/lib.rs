@@ -454,15 +454,73 @@ impl Application for Contract {
 
     fn timeout(
         &self,
-        _ctx: ExecCtx,
-        _lightclient_local: (Addr, Vec<u8>),
-        _lightclient_remote: (Addr, Vec<u8>),
-        _application_remote: Addr,
-        _packet: Vec<u8>,
-        _relayer: Addr,
+        ctx: ExecCtx,
+        lightclient_local: (Addr, Vec<u8>),
+        lightclient_remote: (Addr, Vec<u8>),
+        application_remote: Addr,
+        packet: Vec<u8>,
+        relayer: Addr,
         _sent_funds: Vec<Coin>,
     ) -> Result<Response, Self::Error> {
-        // todo(rano): add timeout logic
-        Ok(Response::default())
+        let mut storage = CwStorage(ctx.deps.storage);
+
+        if Some(&ctx.info.sender) != self.tao_contract.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("timeout can only be called by tao"));
+        }
+
+        let channel = Channel {
+            lightclient_local,
+            lightclient_remote,
+            application_remote,
+        };
+
+        if Some(&channel) != self.allowed_channel.access(&mut storage).get()?.as_ref() {
+            return Err(StdError::generic_err("not allowed channel"));
+        }
+
+        // // ignoring the packet size, as it is originated at the same contract
+        // assert!(
+        //     packet.len() <= 1024,
+        //     "packet size must be less than or equal to 1024 bytes"
+        // );
+
+        let transfer_packet =
+            serde_json::from_slice(&packet).map_err(|e| StdError::generic_err(e.to_string()))?;
+
+        let TransferPacket {
+            sender,
+            receiver,
+            fund,
+            ..
+        } = &transfer_packet;
+
+        let TransferCoin { denom, amount } = fund;
+
+        let refund_address = match receiver {
+            Receiver::Relayer => &relayer,
+            Receiver::Address(_) => sender,
+        };
+
+        // unescrow or mint tokens
+        let msg = match denom {
+            TransferDenom::Native(origin) => {
+                // unescrow tokens
+                cw20::Cw20Contract(Addr::unchecked(origin)).call(Cw20ExecuteMsg::Transfer {
+                    recipient: refund_address.to_string(),
+                    amount: *amount,
+                })?
+            }
+            TransferDenom::Bridged { wrapped, .. } => {
+                // mint tokens
+                cw20::Cw20Contract(Addr::unchecked(wrapped)).call(Cw20ExecuteMsg::Mint {
+                    recipient: refund_address.to_string(),
+                    amount: *amount,
+                })?
+            }
+        };
+
+        // the memo is ignored
+
+        Ok(Response::default().add_message(msg))
     }
 }
