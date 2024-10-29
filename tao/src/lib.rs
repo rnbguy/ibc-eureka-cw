@@ -129,11 +129,11 @@ impl Contract {
                     .executor()
                     .with_funds(funds.clone())
                     .send(
-                        ctx.info.sender.clone(),
                         lightclient_source.clone(),
                         lightclient_destination.clone(),
                         application_destination.clone(),
                         payload.data.clone(),
+                        ctx.info.sender.clone(),
                     )?
                     .build();
 
@@ -215,11 +215,12 @@ impl Contract {
             )
             .executor()
             .receive(
-                funds.clone(),
                 lightclient_destination.clone(),
                 lightclient_source.clone(),
                 application_source.clone(),
                 payload.data.clone(),
+                ctx.info.sender.clone(),
+                funds.clone(),
             )?
             .build();
 

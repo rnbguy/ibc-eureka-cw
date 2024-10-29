@@ -10,21 +10,23 @@ pub trait Application {
     fn send(
         &self,
         ctx: ExecCtx,
-        packet_sender: Addr,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
+        packet_sender: Addr,
     ) -> Result<Response, Self::Error>;
 
+    #[allow(clippy::too_many_arguments)]
     #[sv::msg(exec)]
     fn receive(
         &self,
         ctx: ExecCtx,
-        sent_funds: Vec<Coin>,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
+        relayer: Addr,
+        sent_funds: Vec<Coin>,
     ) -> Result<Response, Self::Error>;
 }

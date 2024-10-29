@@ -229,11 +229,11 @@ impl Application for Contract {
     fn send(
         &self,
         ctx: ExecCtx,
-        packet_sender: Addr,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
+        packet_sender: Addr,
     ) -> Result<Response, Self::Error> {
         let mut storage = CwStorage(ctx.deps.storage);
 
@@ -326,11 +326,12 @@ impl Application for Contract {
     fn receive(
         &self,
         ctx: ExecCtx,
-        _sent_funds: Vec<Coin>,
         lightclient_local: (Addr, Vec<u8>),
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
+        _relayer: Addr,
+        _sent_funds: Vec<Coin>,
     ) -> Result<Response, Self::Error> {
         let mut storage = CwStorage(ctx.deps.storage);
 
