@@ -222,7 +222,9 @@ pub struct TransferCoin {
 
 #[cw_serde]
 pub enum Receiver {
+    // the transfer is a tip to the corresponding relayer
     Relayer,
+    // the transfer is to a specific address
     Address(Addr),
 }
 
