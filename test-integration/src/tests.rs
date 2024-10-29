@@ -191,4 +191,50 @@ fn test_ibc_eureka_cw() {
             application_2_contract.contract_addr, tao_contract.contract_addr, data_2_1
         )
     );
+
+    // test timeout
+
+    let packet_2_1 = Packet {
+        header: PacketHeader {
+            lightclient_source: (lightclient_2_contract.contract_addr.clone(), vec![]),
+            lightclient_destination: (lightclient_1_contract.contract_addr.clone(), vec![]),
+            nonce: 2,
+            timeout: chain_1.block_info().time.seconds() + 10,
+        },
+        payloads: vec![Payload {
+            header: PayloadHeader {
+                application_source: application_2_contract.contract_addr.clone(),
+                application_destination: application_1_contract.contract_addr.clone(),
+                funds: vec![],
+            },
+            data: data_2_1.as_bytes().to_vec(),
+        }],
+    };
+
+    tao_contract
+        .send_packet(packet_2_1.clone())
+        .call(&alice)
+        .unwrap();
+
+    assert_eq!(
+        application_2_contract.sent_value().unwrap(),
+        format!(
+            "{}(via {}) receives {}",
+            application_1_contract.contract_addr, tao_contract.contract_addr, data_2_1
+        )
+    );
+
+    // anyone can relay received packet, as commitment proof is included
+    tao_contract
+        .timeout_packet(packet_2_1, 0, vec![])
+        .call(&hacker)
+        .unwrap();
+
+    assert_eq!(
+        application_2_contract.received_value().unwrap(),
+        format!(
+            "time-out {}(via {}) sent {}",
+            application_1_contract.contract_addr, tao_contract.contract_addr, data_2_1
+        )
+    );
 }
