@@ -365,8 +365,10 @@ impl Application for Contract {
             "packet size must be less than or equal to 1024 bytes"
         );
 
-        let TransferPacket { receiver, fund, .. } =
+        let transfer_packet =
             serde_json::from_slice(&packet).map_err(|e| StdError::generic_err(e.to_string()))?;
+
+        let TransferPacket { receiver, fund, .. } = &transfer_packet;
 
         let TransferCoin { denom, .. } = &fund;
 
@@ -399,6 +401,11 @@ impl Application for Contract {
                     admin: None,
                 };
 
+                self.pending_packet
+                    .access(&mut storage)
+                    .set(&(channel.clone(), relayer, origin.clone(), transfer_packet))
+                    .unwrap();
+
                 let sub_msg = SubMsg::reply_on_success(wasm_msg, REPLY_INSTANTIATE_ID);
 
                 return Ok(Response::default().add_submessage(sub_msg));
@@ -408,7 +415,7 @@ impl Application for Contract {
         let TransferCoin { denom, amount } = fund;
 
         let receiver_address = match receiver {
-            Receiver::Relayer => relayer,
+            Receiver::Relayer => &relayer,
             Receiver::Address(addr) => addr,
         };
 
@@ -425,14 +432,14 @@ impl Application for Contract {
                 // mint tokens
                 cw20::Cw20Contract(local_cw20).call(Cw20ExecuteMsg::Mint {
                     recipient: receiver_address.to_string(),
-                    amount,
+                    amount: *amount,
                 })?
             }
             TransferDenom::Bridged { origin, .. } => {
                 // unescrow tokens
                 cw20::Cw20Contract(Addr::unchecked(origin)).call(Cw20ExecuteMsg::Transfer {
                     recipient: receiver_address.to_string(),
-                    amount,
+                    amount: *amount,
                 })?
             }
         };
