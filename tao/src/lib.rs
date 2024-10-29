@@ -76,9 +76,9 @@ impl Contract {
             payloads,
         } = &packet;
 
-        if timeout < &ctx.env.block.time.seconds() {
+        if timeout <= &ctx.env.block.time.seconds() {
             return Err(StdError::generic_err(format!(
-                "timeout is in the past: current time: {}, timeout: {}",
+                "timeout is not in future: current time: {}, timeout: {}",
                 ctx.env.block.time.seconds(),
                 timeout
             )));
@@ -171,9 +171,9 @@ impl Contract {
             payloads,
         } = &packet;
 
-        if timeout < &ctx.env.block.time.seconds() {
+        if timeout <= &ctx.env.block.time.seconds() {
             return Err(StdError::generic_err(format!(
-                "timeout is in the past: current time: {}, timeout: {}",
+                "timeout is not in future: current time: {}, timeout: {}",
                 ctx.env.block.time.seconds(),
                 timeout
             )));
@@ -300,9 +300,9 @@ impl Contract {
                 .querier(&ctx.deps.querier)
                 .timestamp(height)?;
 
-        if &proof_height_timestamp < timeout {
+        if timeout > &proof_height_timestamp {
             return Err(StdError::generic_err(format!(
-                "timeout is in the future for proof height: current time: {}, timeout: {}",
+                "timeout is in future for proof height: current time: {}, timeout: {}",
                 proof_height_timestamp, timeout
             )));
         }
