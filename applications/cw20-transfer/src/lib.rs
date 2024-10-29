@@ -35,7 +35,7 @@ pub struct Contract {
     pub cw20_to_channel: Map<String, Item<(Channel, String)>>,
 
     // reply
-    pub pending_packet: Item<(Channel, String, TransferPacket)>,
+    pub pending_packet: Item<(Channel, Addr, String, TransferPacket)>,
 }
 
 #[cfg_attr(not(feature = "library"), sylvia::entry_points)]
@@ -148,7 +148,7 @@ impl Contract {
 
                 let new_cw20_addr = Addr::unchecked(event.attributes[0].value.clone());
 
-                let (channel, origin, TransferPacket { receiver, fund, .. }) =
+                let (channel, relayer, origin, TransferPacket { receiver, fund, .. }) =
                     self.pending_packet.access(&mut storage).get()?.unwrap();
 
                 self.pending_packet.access(&mut storage).remove();
@@ -169,6 +169,11 @@ impl Contract {
 
                 let TransferCoin { amount, denom } = fund;
 
+                let receiver_address = match receiver {
+                    Receiver::Relayer => relayer,
+                    Receiver::Address(addr) => addr,
+                };
+
                 let msg = match denom {
                     TransferDenom::Native(origin) => {
                         // create new cw20 token, if not present
@@ -181,7 +186,7 @@ impl Contract {
 
                         // mint tokens
                         cw20::Cw20Contract(local_cw20).call(Cw20ExecuteMsg::Mint {
-                            recipient: receiver.to_string(),
+                            recipient: receiver_address.to_string(),
                             amount,
                         })?
                     }
@@ -189,7 +194,7 @@ impl Contract {
                         // unescrow tokens
                         cw20::Cw20Contract(Addr::unchecked(origin)).call(
                             Cw20ExecuteMsg::Transfer {
-                                recipient: receiver.to_string(),
+                                recipient: receiver_address.to_string(),
                                 amount,
                             },
                         )?
@@ -216,9 +221,15 @@ pub struct TransferCoin {
 }
 
 #[cw_serde]
+pub enum Receiver {
+    Relayer,
+    Address(Addr),
+}
+
+#[cw_serde]
 pub struct TransferPacket {
     pub sender: Addr,
-    pub receiver: Addr,
+    pub receiver: Receiver,
     pub fund: TransferCoin,
     pub memo: String,
 }
@@ -330,7 +341,7 @@ impl Application for Contract {
         lightclient_remote: (Addr, Vec<u8>),
         application_remote: Addr,
         packet: Vec<u8>,
-        _relayer: Addr,
+        relayer: Addr,
         _sent_funds: Vec<Coin>,
     ) -> Result<Response, Self::Error> {
         let mut storage = CwStorage(ctx.deps.storage);
@@ -396,6 +407,11 @@ impl Application for Contract {
 
         let TransferCoin { denom, amount } = fund;
 
+        let receiver_address = match receiver {
+            Receiver::Relayer => relayer,
+            Receiver::Address(addr) => addr,
+        };
+
         // unescrow or mint tokens
         let msg = match denom {
             TransferDenom::Native(origin) => {
@@ -408,14 +424,14 @@ impl Application for Contract {
 
                 // mint tokens
                 cw20::Cw20Contract(local_cw20).call(Cw20ExecuteMsg::Mint {
-                    recipient: receiver.to_string(),
+                    recipient: receiver_address.to_string(),
                     amount,
                 })?
             }
             TransferDenom::Bridged { origin, .. } => {
                 // unescrow tokens
                 cw20::Cw20Contract(Addr::unchecked(origin)).call(Cw20ExecuteMsg::Transfer {
-                    recipient: receiver.to_string(),
+                    recipient: receiver_address.to_string(),
                     amount,
                 })?
             }
